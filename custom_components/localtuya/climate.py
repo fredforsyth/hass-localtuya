@@ -21,6 +21,8 @@ from homeassistant.components.climate.const import (
     PRESET_ECO,
     PRESET_HOME,
     PRESET_NONE,
+    SWING_OFF,
+    SWING_ON,
     ClimateEntityFeature,
 )
 from homeassistant.const import (
@@ -127,6 +129,9 @@ DEFAULT_TEMPERATURE_STEP = PRECISION_HALVES
 MODE_WAIT = 0.1
 
 FAN_SPEEDS_DEFAULT = {"1": "Low", "2": "Medium", "3": "High"}
+
+# Default map for boolean swing mode
+DEFAULT_BOOL_SWING_MODES = {False: SWING_OFF, True: SWING_ON}
 
 
 def flow_schema(dps):
@@ -238,13 +243,19 @@ class LocalTuyaClimate(LocalTuyaEntity, ClimateEntity):
         self._fan_speeds = DictSelector(self._config.get(CONF_FAN_SPEED_LIST, {}))
 
         # Swing configurations.
+        # Provide a binary mode selector if none is defined.
         self._swing_v_mode_dp = self._config.get(CONF_SWING_MODE_DP)
-        self._swing_v_modes = DictSelector(self._config.get(CONF_SWING_MODES, {}))
-        self._swing_h_mode_dp = self._config.get(CONF_SWING_HORIZONTAL_DP)
-        self._swing_h_modes = DictSelector(
-            self._config.get(CONF_SWING_HORIZONTAL_MODES, {})
-        )
+        swing_modes = self._config.get(CONF_SWING_MODES, {})
+        if self._swing_v_mode_dp and not swing_modes:
+            swing_modes = DEFAULT_BOOL_SWING_MODES
+        self._swing_v_modes = DictSelector(swing_modes)
 
+        self._swing_h_mode_dp = self._config.get(CONF_SWING_HORIZONTAL_DP)
+        swing_modes = self._config.get(CONF_SWING_HORIZONTAL_MODES, {})
+        if self._swing_h_mode_dp and not swing_modes:
+            swing_modes = DEFAULT_BOOL_SWING_MODES
+        self._swing_h_modes = DictSelector(swing_modes)
+        
         # Eco!?
         self._eco_dp = self._config.get(CONF_ECO_DP)
         self._eco_value = self._config.get(CONF_ECO_VALUE, "ECO")
