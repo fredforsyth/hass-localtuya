@@ -329,7 +329,7 @@ class LocalTuyaClimate(LocalTuyaEntity, ClimateEntity):
         """Return current operation ie. heat, cool, idle."""
         if not self._is_on:
             return HVACMode.OFF
-        if not self._hvac_mode_dp:
+        if not self._hvac_mode_dp or self._hvac_mode_dp == self._preset_dp:
             return HVACMode.HEAT
 
         return self._hvac_mode
@@ -353,8 +353,16 @@ class LocalTuyaClimate(LocalTuyaEntity, ClimateEntity):
 
         hvac_action = self._hvac_action
         hvac_mode = self._hvac_mode
+        preset_mode = self._preset_mode
 
         if (
+            (self._config.get(CONF_HEURISTIC_ACTION) or self._hvac_mode_dp == self._preset_dp)
+            and preset_mode != PRESET_NONE
+        ):
+            # If we can't tell the difference between a preset and a mode then assume presets are heating
+            hvac_action = HVACAction.HEATING
+
+        elif (
             (self._config.get(CONF_HEURISTIC_ACTION) or not self._hvac_action_dp)
             and (target_temperature := self._target_temperature) is not None
             and (current_temperature := self._current_temperature) is not None
@@ -397,7 +405,7 @@ class LocalTuyaClimate(LocalTuyaEntity, ClimateEntity):
         if self._preset_dp == self._hvac_mode_dp and (
             mode in self._hvac_mode_set.values
         ):
-            return None
+            return PRESET_NONE
 
         return self._preset_mode
 
@@ -518,6 +526,9 @@ class LocalTuyaClimate(LocalTuyaEntity, ClimateEntity):
 
     async def async_set_preset_mode(self, preset_mode):
         """Set new target preset mode."""
+        if preset_mode != PRESET_NONE and not self._is_on:
+            await self.async_turn_on()
+
         if preset_mode == PRESET_ECO:
             await self._device.set_dp(self._eco_value, self._eco_dp)
             return
